@@ -1,0 +1,48 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            preset: win-vs2022
+            artefact: build/win-vs2022/plugin/Kickforge_artefacts/Release
+          - os: macos-latest
+            preset: mac-xcode
+            artefact: build/mac-xcode/plugin/Kickforge_artefacts/Release
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache CPM downloads
+        uses: actions/cache@v4
+        with:
+          path: .cache/cpm
+          key: cpm-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}-release --parallel
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}-release
+
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: KICKFORGE-${{ runner.os }}
+          path: |
+            ${{ matrix.artefact }}/VST3
+            ${{ matrix.artefact }}/AU
+            ${{ matrix.artefact }}/Standalone
+          if-no-files-found: warn
