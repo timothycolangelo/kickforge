@@ -26,6 +26,14 @@
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
     },
     {
+      "name": "win-ninja",
+      "displayName": "Windows, Ninja + MSVC (run from a VS developer shell)",
+      "inherits": "base",
+      "generator": "Ninja Multi-Config",
+      "cacheVariables": { "CMAKE_C_COMPILER": "cl", "CMAKE_CXX_COMPILER": "cl" },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
       "name": "mac-xcode",
       "displayName": "macOS, Xcode (universal)",
       "inherits": "base",
@@ -37,11 +45,13 @@
   "buildPresets": [
     { "name": "win-vs2022-release", "configurePreset": "win-vs2022", "configuration": "Release" },
     { "name": "win-vs2019-release", "configurePreset": "win-vs2019", "configuration": "Release" },
+    { "name": "win-ninja-release", "configurePreset": "win-ninja", "configuration": "Release" },
     { "name": "mac-xcode-release", "configurePreset": "mac-xcode", "configuration": "Release" }
   ],
   "testPresets": [
     { "name": "win-vs2022-release", "configurePreset": "win-vs2022", "configuration": "Release", "output": { "outputOnFailure": true } },
     { "name": "win-vs2019-release", "configurePreset": "win-vs2019", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "win-ninja-release", "configurePreset": "win-ninja", "configuration": "Release", "output": { "outputOnFailure": true } },
     { "name": "mac-xcode-release", "configurePreset": "mac-xcode", "configuration": "Release", "output": { "outputOnFailure": true } }
   ]
 }

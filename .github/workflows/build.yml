@@ -13,8 +13,10 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            preset: win-vs2022
-            artefact: build/win-vs2022/plugin/Kickforge_artefacts/Release
+            # Ninja + whatever MSVC the runner image ships, so we don't depend
+            # on a specific Visual Studio generator being installed.
+            preset: win-ninja
+            artefact: build/win-ninja/plugin/Kickforge_artefacts/Release
           - os: macos-latest
             preset: mac-xcode
             artefact: build/mac-xcode/plugin/Kickforge_artefacts/Release
@@ -27,6 +29,12 @@ jobs:
         with:
           path: .cache/cpm
           key: cpm-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Set up MSVC developer environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
