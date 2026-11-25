@@ -1,36 +1,84 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-
-#include "kick/KickDsp.h"
+#include "Parameters.h"
 
 KickforgeProcessor::KickforgeProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts (*this, nullptr, "KICKFORGE", createLayout())
+      apvts (*this, nullptr, "KICKFORGE", kf::createParameterLayout()),
+      renderThread (apvts, bufferStore)
 {
+    renderThread.start();
 }
 
-juce::AudioProcessorValueTreeState::ParameterLayout KickforgeProcessor::createLayout()
+KickforgeProcessor::~KickforgeProcessor()
 {
-    // Milestone 1 placeholder. The real parameter set arrives in Milestone 2.
-    juce::AudioProcessorValueTreeState::ParameterLayout layout;
-    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "gain", 1 }, "Gain",
-                                                             juce::NormalisableRange<float> (-24.0f, 6.0f, 0.01f), 0.0f));
-    return layout;
+    renderThread.stop();
 }
 
-void KickforgeProcessor::prepareToPlay (double, int) {}
+void KickforgeProcessor::prepareToPlay (double sampleRate, int)
+{
+    voicePos = -1;
+    voiceBuffer = nullptr;
+    playheadForGui.store (-1);
+    renderThread.setSampleRateAndRenderNow (sampleRate);
+}
 
 bool KickforgeProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
-    // The kick is mono; we offer mono or stereo (duplicated) output.
+    // The kick is mono; we offer mono or stereo (the same signal on both).
     const auto out = layouts.getMainOutputChannelSet();
     return out == juce::AudioChannelSet::mono() || out == juce::AudioChannelSet::stereo();
 }
 
-void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void KickforgeProcessor::startVoice() noexcept
+{
+    voiceBuffer = bufferStore.acquireForPlayback();
+    voicePos = voiceBuffer != nullptr ? 0 : -1;
+}
+
+void KickforgeProcessor::renderVoice (juce::AudioBuffer<float>& buffer, int start, int num) noexcept
+{
+    if (voicePos < 0 || voiceBuffer == nullptr || num <= 0)
+        return;
+
+    const auto& src = voiceBuffer->samples;
+    const auto available = static_cast<int> (src.size()) - voicePos;
+    const auto n = juce::jmin (num, available);
+
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        buffer.copyFrom (ch, start, src.data() + voicePos, n);
+
+    voicePos += n;
+    if (voicePos >= static_cast<int> (src.size()))
+        voicePos = -1;
+}
+
+void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
+
+    const auto numSamples = buffer.getNumSamples();
+    int pos = 0;
+
+    if (auditionRequested.exchange (false))
+        startVoice();
+
+    // Split the block at every note-on so retriggers are sample-accurate.
+    for (const auto metadata : midi)
+    {
+        const auto msg = metadata.getMessage();
+        if (! msg.isNoteOn())
+            continue;
+
+        const auto at = juce::jlimit (0, numSamples, metadata.samplePosition);
+        renderVoice (buffer, pos, at - pos);
+        pos = at;
+        startVoice();
+    }
+
+    renderVoice (buffer, pos, numSamples - pos);
+    playheadForGui.store (voicePos);
 }
 
 juce::AudioProcessorEditor* KickforgeProcessor::createEditor()

@@ -5,7 +5,8 @@
 # modules are linked PRIVATE and only used inside the .cpp files.
 
 add_library(kick_dsp STATIC
-    src/KickDsp.cpp)
+    src/KickDsp.cpp
+    src/Renderer.cpp)
 
 target_include_directories(kick_dsp PUBLIC include)
 

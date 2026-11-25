@@ -21,7 +21,9 @@ juce_add_plugin(Kickforge
 
 target_sources(Kickforge PRIVATE
     Source/PluginProcessor.cpp
-    Source/PluginEditor.cpp)
+    Source/PluginEditor.cpp
+    Source/Parameters.cpp
+    Source/RenderThread.cpp)
 
 target_include_directories(Kickforge PRIVATE Source)
 

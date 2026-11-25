@@ -2,11 +2,14 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "KickBufferStore.h"
+#include "RenderThread.h"
+
 class KickforgeProcessor final : public juce::AudioProcessor
 {
 public:
     KickforgeProcessor();
-    ~KickforgeProcessor() override = default;
+    ~KickforgeProcessor() override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -32,10 +35,29 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    // Plays the kick from the start on the next audio block (GUI audition).
+    void triggerAudition() noexcept { auditionRequested.store (true); }
+
+    // Playback position in samples, or -1 when idle. For the GUI playhead.
+    int getPlayheadSample() const noexcept { return playheadForGui.load(); }
+
+    kf::KickBufferStore& getBufferStore() noexcept { return bufferStore; }
+
     juce::AudioProcessorValueTreeState apvts;
 
 private:
-    static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
+    void startVoice() noexcept;
+    void renderVoice (juce::AudioBuffer<float>&, int start, int num) noexcept;
+
+    kf::KickBufferStore bufferStore;
+    kf::RenderThread renderThread;
+
+    // Audio-thread voice state.
+    const kf::KickBuffer* voiceBuffer = nullptr;
+    int voicePos = -1;
+
+    std::atomic<bool> auditionRequested { false };
+    std::atomic<int> playheadForGui { -1 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KickforgeProcessor)
 };

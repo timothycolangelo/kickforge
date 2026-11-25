@@ -27,6 +27,7 @@ endif()
 
 add_subdirectory(dsp)
 add_subdirectory(plugin)
+add_subdirectory(tools)
 
 if(KF_BUILD_TESTS)
     enable_testing()
